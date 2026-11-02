@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kirak MCP server",
+  "description": "One MCP server, defined in a JSON file in the project's mcp/ directory. With \"mcp\" in kirak.json modules, Kirak serves it at /mcp/<name>/ over Streamable HTTP; any MCP client can connect and sees only the tools listed here (plus Python tools registered with @kirak.mcp(\"<name>\").tool).",
+  "type": "object",
+  "required": [
+    "name",
+    "description"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Points editors at this schema. Kirak ignores it when loading."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 64,
+      "description": "The server's name: its URL (/mcp/<name>/) and how code and monitoring refer to it. Unique across mcp/.",
+      "x-kirak-errors": {
+        "pattern": "'name' must be lowercase letters, digits and _, starting with a letter."
+      }
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the server is for, shown to clients as the server's description."
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Guidance sent to the client when it connects, for the model using the tools. Not enforced."
+    },
+    "access": {
+      "type": "string",
+      "enum": [
+        "Guest",
+        "User",
+        "Admin",
+        "System"
+      ],
+      "description": "Who may connect: Guest (anyone), User (any signed-in caller), Admin (role admin), System (system). Default User. Every tool call still runs as the caller, under the models' access rules."
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Only callers with one of these roles may connect, checked after access (e.g. [\"support\", \"admin\"]). Default: any role access allows."
+    },
+    "rate_limit_per_minute": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Requests per minute per caller (per client IP for guests). Default 60."
+    },
+    "tools": {
+      "$ref": "tools.schema.json",
+      "description": "The Kirak operations this server offers as tools, keyed by ref. Default {}."
+    }
+  },
+  "x-kirak-version": "0.1.2"
+}

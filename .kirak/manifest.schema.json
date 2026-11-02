@@ -1,0 +1,1006 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kirak kirak.json",
+  "description": "Project settings of a Kirak app. Required in every project. Secrets (keys, passwords, tokens) never go here: they are environment variables. An optional kirak.local.json next to it is merged over it (objects key by key, everything else replaced) and the result is validated against this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Points editors at this schema. Kirak ignores it when loading."
+    },
+    "version": {
+      "type": "string",
+      "description": "The API's version, published in openapi.json. Default \"1.0.0\"."
+    },
+    "title": {
+      "type": "string",
+      "description": "The API's title, published in openapi.json and as the heading of GET /docs. Default \"Kirak API\"."
+    },
+    "description": {
+      "type": "string",
+      "description": "The API's description, published in openapi.json. Default empty."
+    },
+    "log_level": {
+      "type": "string",
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR",
+        "CRITICAL"
+      ],
+      "description": "Lowest level written to kirak.log and stdout, for every module's logger: DEBUG lines are dropped at INFO. Default INFO."
+    },
+    "log_path": {
+      "type": "string",
+      "description": "Directory of the shared log file kirak.log, relative to the working directory or absolute (file output only). Default \"logs\"."
+    },
+    "log_output": {
+      "type": "string",
+      "enum": [
+        "file",
+        "stdout",
+        "both"
+      ],
+      "description": "Where the app's log lines go: \"file\" (kirak.log in log_path), \"stdout\" (the same lines on standard output, no file, for stateless platforms) or \"both\". Default \"file\"."
+    },
+    "log_format": {
+      "type": "string",
+      "enum": [
+        "text",
+        "json"
+      ],
+      "description": "Format of the app's log lines on stdout: \"text\" (the default readable format) or \"json\" (one JSON object per line with a severity field, for Cloud Logging and similar collectors). Applies only when log_output is \"stdout\" or \"both\". Default \"text\"."
+    },
+    "log_max_size_mb": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Size in megabytes at which kirak.log rotates. Default 5."
+    },
+    "log_backup_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of rotated log files kept. Default 1."
+    },
+    "assets_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Project directory searched first for overrides of bundled assets such as email templates. Default null (the assets/ directory)."
+    },
+    "strict_access": {
+      "type": "boolean",
+      "description": "When true, startup fails if any model has a missing or invalid access block, instead of serving it unprotected. Default false."
+    },
+    "hook_timeout_seconds": {
+      "type": "number",
+      "minimum": 0.1,
+      "description": "Maximum seconds an async hook may run before it is cancelled and skipped. Applies to every module's hooks. Default 5.0."
+    },
+    "project_name": {
+      "type": "string",
+      "description": "Display name used in OTP text messages, as the authenticator-app issuer for MFA, and as the default app_name of SMS templates."
+    },
+    "base_url": {
+      "type": "string",
+      "description": "Public base URL of the app, without a trailing slash. Used for links in verification and password reset emails and for social login callbacks. Registration answers 500 CONFIGURATION_ERROR without it.",
+      "examples": [
+        "https://api.example.com"
+      ]
+    },
+    "bulk_chunk_size": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Records per chunk for bulk create, update, delete and destroy. Lower it if the database rejects large packets. Default 500."
+    },
+    "max_body_mb": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Largest request body in MB; a larger one is refused with 413 PAYLOAD_TOO_LARGE. The storage upload routes take image_max_size / file_max_size instead. Default 10."
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Database connection settings. The password is a secret: DB_PASSWORD in the environment.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "mysql",
+            "postgres",
+            "postgresql",
+            "sqlite"
+          ],
+          "description": "Database engine. postgresql is the same as postgres. sqlite is a database file; host, port, user, DB_PASSWORD and pool_min do not apply to it. Default mysql."
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Database hostname or IP. Default localhost."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Database port. Default 3306 for MySQL, 5432 for PostgreSQL."
+        },
+        "name": {
+          "type": "string",
+          "description": "Database name; for sqlite, the path of the database file, relative to the working directory (created when missing). Required: startup fails when it is empty."
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Database user. Default root."
+        },
+        "pool_min": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Minimum connections in the pool. Must not exceed pool_max. Default 1."
+        },
+        "pool_max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum connections in the pool (sqlite: connections opened to the file). Default 10."
+        },
+        "pool_recycle_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Seconds after which an idle connection is replaced (MySQL only). Default 3600."
+        }
+      }
+    },
+    "branding": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Look of Kirak's built-in emails and pages. A template's own parameters override these.",
+      "properties": {
+        "logo": {
+          "type": "string",
+          "description": "URL of the logo shown in email headers."
+        },
+        "support_email": {
+          "type": "string",
+          "description": "Support address shown in email footers."
+        },
+        "website_url": {
+          "type": "string",
+          "description": "Website URL used for footer links."
+        },
+        "login_url": {
+          "type": "string",
+          "description": "Login page URL linked from verification and reset emails."
+        },
+        "primary_bg_color": {
+          "type": "string",
+          "description": "Primary background colour, hex. Default #000000."
+        },
+        "secondary_bg_color": {
+          "type": "string",
+          "description": "Accent and button background colour, hex. Default #E7054C."
+        },
+        "primary_text_color": {
+          "type": "string",
+          "description": "Primary text colour, hex. Default #000000."
+        },
+        "secondary_text_color": {
+          "type": "string",
+          "description": "Text colour on accent backgrounds, hex. Default #FFFFFF."
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "Modules to enable: notifications, payments, integrations, ai, storage, scheduler, monitoring, vector, mcp. Each needs its pip extra installed.",
+      "examples": [
+        [
+          "notifications",
+          "payments"
+        ]
+      ]
+    },
+    "cors": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cross-origin (CORS) settings.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Add the CORS middleware. Default true."
+        },
+        "allow_credentials": {
+          "type": "boolean",
+          "description": "Allow cookies and credentials in cross-origin requests. Default true."
+        },
+        "allow_methods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed HTTP methods. Default [\"*\"]."
+        },
+        "allow_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed request headers. Default [\"*\"]."
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Allowed origins. Default [].",
+          "examples": [
+            [
+              "https://app.example.com"
+            ]
+          ]
+        },
+        "allow_origin_regex": {
+          "type": "string",
+          "description": "Regular expression of allowed origins, in addition to origins."
+        }
+      }
+    },
+    "docs": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "GET /docs: the app's HTTP API described in Markdown for AI agents (models, CRUD, GraphQL, modules, custom routes).",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Serve the document. false registers no route (404). Does not affect openapi.json. Default true."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Path of the document. Default \"/docs\"."
+        },
+        "public": {
+          "type": "boolean",
+          "description": "Serve it without a credential. false requires a signed-in caller or an API key. Default true."
+        }
+      }
+    },
+    "routes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "URL paths of Kirak's routers.",
+      "properties": {
+        "crud_prefix": {
+          "type": "string",
+          "pattern": "^(/.*[^/])?$",
+          "description": "Path in front of every CRUD route (\"/api\" -> /api/<model>). Default \"\" (none)."
+        },
+        "auth_prefix": {
+          "type": "string",
+          "pattern": "^/.*[^/]$",
+          "description": "Path of the auth routes; replaces /auth (\"/api/auth\" -> /api/auth/login). Links Kirak builds (emails, social redirect_uri) follow it. Default \"/auth\"."
+        },
+        "module_prefixes": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "notifications",
+              "payments",
+              "integrations",
+              "ai",
+              "storage",
+              "scheduler",
+              "monitoring",
+              "vector",
+              "mcp"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^/.*[^/]$"
+          },
+          "description": "Path of a module's routes, replacing /<module>. Default: each module at /<module>.",
+          "examples": [
+            {
+              "notifications": "/notif"
+            }
+          ]
+        }
+      }
+    },
+    "openapi": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "GET /openapi.json: the OpenAPI 3.1 document, with one set of CRUD paths per model.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Serve it. false registers no route (404). Does not affect /docs. Default true."
+        },
+        "public": {
+          "type": "boolean",
+          "description": "Serve it without a credential. false requires a signed-in caller or an API key. Independent of docs.public. Default true."
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Authentication settings. Signing keys and client secrets are environment variables (KIRAK_AUTH_*).",
+      "properties": {
+        "jwt_algorithm": {
+          "type": "string",
+          "enum": [
+            "HS256",
+            "HS384",
+            "HS512"
+          ],
+          "description": "Token signing algorithm. Asymmetric algorithms are rejected. Default HS256."
+        },
+        "access_token_expire_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Access token lifetime in hours. Default 1."
+        },
+        "access_token_expire_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Access token lifetime in minutes, for lifetimes under an hour. When set, wins over access_token_expire_hours."
+        },
+        "refresh_token_expire_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Refresh token lifetime in days. Default 14."
+        },
+        "refresh_token_reuse_interval_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Seconds a rotated refresh token may still be used, for retries and tabs refreshing at once. Used later, it revokes its whole session. 0 disables the window. Default 10."
+        },
+        "cookie_name": {
+          "type": "string",
+          "description": "When set, access tokens are also written to an HttpOnly cookie of this name on login, OTP verification, refresh and social callbacks."
+        },
+        "cookie_domain": {
+          "type": "string",
+          "description": "Cookie domain. A leading dot (.example.com) shares it across subdomains."
+        },
+        "social_providers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "description": "Social login providers to enable, by social-core name (e.g. google-oauth2, github, apple-id).",
+          "examples": [
+            [
+              "google-oauth2",
+              "github"
+            ]
+          ]
+        },
+        "social": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+          },
+          "description": "Non-secret settings per social provider. The block key is the social-core provider name (e.g. google-oauth2, apple-id, discord). All providers accept client_id, redirect_uri, scope and allow_no_email. Apple (apple-id) also accepts key_id, team_id. Google (google-oauth2) and OpenID Connect providers also accept audience and nonce for mobile native sign-in. Any other setting a backend reads can be set as its lowercase social-core name (e.g. auth0: {\"domain\": ...}). Secrets use the social-core convention: SOCIAL_AUTH_<BACKEND>_SECRET; other secret settings (client_assertion, sp_private_key, bot_token, api_key) are SOCIAL_AUTH_<BACKEND>_<SETTING>.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Settings of one provider. The block key must be the exact social-core provider name from auth.social_providers. All providers accept client_id, redirect_uri, scope, allow_no_email and require_verified_email. GitHub (github) additionally accepts require_public_email. Apple (apple-id) additionally accepts key_id, team_id. Google (google-oauth2) and OpenID Connect providers additionally accept audience and nonce. Every provider also accepts the other settings its backend reads (`kirak catalog --json`, social_providers[].extra_settings).",
+            "properties": {
+              "client_id": {
+                "type": "string",
+                "description": "OAuth client ID (Apple: the service ID; all other providers: the app/client ID)."
+              },
+              "key_id": {
+                "type": "string",
+                "description": "Key ID of the private key (Apple only)."
+              },
+              "team_id": {
+                "type": "string",
+                "description": "Developer team ID (Apple only)."
+              },
+              "redirect_uri": {
+                "type": "string",
+                "description": "Callback URL. Default {base_url}/auth/{provider}/callback (/auth is routes.auth_prefix when set)."
+              },
+              "scope": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "description": "Extra OAuth scopes to ask the provider for, as a list or one string separated by spaces or commas. They are added to the scopes the provider's backend asks for by default (GitHub always gets user:email). Example for GitHub: [\"read:org\"]."
+              },
+              "allow_no_email": {
+                "type": "boolean",
+                "description": "For a provider that never sends an email (reddit, instagram, tiktok, twitter-oauth2): a first sign-in without an email creates an account with no email, found again through its provider link and never linked to another account by email. Off, such a sign-in answers 401 SOCIAL_EMAIL_MISSING. Leave it off for providers that send an email when the user allows it, or a user who declines gets an extra account. Default false."
+              },
+              "require_verified_email": {
+                "type": "boolean",
+                "description": "Refuse a first sign-in whose email the provider did not confirm as verified: 403 EMAIL_NOT_VERIFIED, with a message that tells the user to verify it with the provider. A user who already has a link is not affected. Providers that send no verified flag (Facebook, ...) are always refused, so turn it on only for providers that send one (GitHub, Google, Apple, Discord, OpenID Connect). Default false."
+              },
+              "require_public_email": {
+                "type": "boolean",
+                "description": "GitHub only: refuse a first sign-in whose GitHub email is private: 403 SOCIAL_EMAIL_PRIVATE, with a message that tells the user to make the email public on GitHub. Kirak can read a private email (it always asks for user:email); this setting is for apps that want the public one. A user who already has a link is not affected. Default false."
+              },
+              "audience": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "description": "Google and OpenID Connect: client IDs a mobile sign-in ID token may be issued to. Default [client_id]."
+              },
+              "nonce": {
+                "type": "string",
+                "enum": [
+                  "optional",
+                  "required"
+                ],
+                "description": "Google and Apple mobile sign-in: whether the app must send the raw nonce. optional checks it when sent. Default optional."
+              }
+            }
+          },
+          "examples": [
+            {
+              "google-oauth2": {
+                "client_id": "123456-abc.apps.googleusercontent.com"
+              },
+              "apple-id": {
+                "client_id": "com.example.app.service",
+                "team_id": "ABCDE12345",
+                "key_id": "K1L2M3N4"
+              }
+            }
+          ]
+        },
+        "forgot_password_page_url": {
+          "type": "string",
+          "description": "Frontend page with the password reset form, linked from reset emails. Default {base_url}/auth/forgot-password (/auth is routes.auth_prefix when set)."
+        },
+        "redirect_urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Exact URLs a browser social sign-in may return to (redirect_to), with a one-time code the app exchanges at /auth/token/exchange: an app's URL scheme (com.example.app://auth) or a web page. Matched exactly: no wildcards, no query. Default [] (sign-ins answer with JSON).",
+          "examples": [
+            [
+              "com.example.app://auth-callback",
+              "https://app.example.com/auth/callback"
+            ]
+          ]
+        },
+        "bcrypt_rounds": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 31,
+          "description": "bcrypt work factor for password hashes. Each step doubles the time a hash takes (12: about 0.25 s). Do not go below 12 in production. Default 12."
+        },
+        "password_complexity": {
+          "type": "boolean",
+          "description": "Require an uppercase letter, a lowercase letter, a digit and a special character. The minimum length of 12 always applies. Default true."
+        },
+        "account_close_window": {
+          "type": "string",
+          "enum": [
+            "immediate",
+            "24h",
+            "30d"
+          ],
+          "description": "Time between closing an account (POST /auth/close-account) and deleting its data. During the window the account cannot sign in and an admin can restore it; immediate deletes at once. Default 30d."
+        }
+      }
+    },
+    "rate_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Default API rate limit. A model's own rate_limit block overrides it.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false turns off per-model CRUD limits and the built-in auth endpoint limits. Default true."
+        },
+        "default_max_requests": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Requests per window for models without their own rate_limit. Default 100."
+        },
+        "default_window_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Window length, in seconds, for the default limit. Default 60."
+        },
+        "trusted_proxy_ips": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IPs of proxies and load balancers trusted to set X-Forwarded-For / X-Real-IP when working out the client IP. Default []."
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Redis used by Kirak (KIRAK_REDIS_URL and Redis scheduler providers).",
+      "properties": {
+        "key_prefix": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,47}$",
+          "description": "Start of every Redis key Kirak writes (<prefix>:jobs:..., <prefix>:rl:...). Apps that share a Redis database each need their own; an app with a base_url claims its prefix at startup and refuses to start when another app holds it. Lowercase letters, digits, _ and -. Default \"kirak\"."
+        }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Default Redis query caching for models. Needs KIRAK_REDIS_URL. A model's own cache block overrides it.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Cache model reads by default. Default false."
+        },
+        "default_ttl_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Seconds a cached result is served. Default 60."
+        }
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Notifications module: one provider set per channel. Credentials are environment variables: KIRAK_NOTIFICATION_<CHANNEL>_<INSTANCE>_<FIELD>.",
+      "properties": {
+        "email_from_address": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Sender address, e.g. no-reply@example.com."
+        },
+        "email_from_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Sender display name."
+        },
+        "sms_from_number": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SMS sender number or name, used when a provider instance sets none."
+        },
+        "attachment_base_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Directory email attachment paths are resolved from."
+        },
+        "email": {
+          "$ref": "#/definitions/provider_set",
+          "description": "Email providers (e.g. aws_ses, sendgrid, smtp)."
+        },
+        "sms": {
+          "$ref": "#/definitions/provider_set",
+          "description": "SMS providers (e.g. aws_sns, twilio)."
+        },
+        "push": {
+          "$ref": "#/definitions/provider_set",
+          "description": "Push providers (e.g. firebase, apn, huawei)."
+        },
+        "im": {
+          "$ref": "#/definitions/provider_set",
+          "description": "Instant messaging providers (e.g. slack, discord, telegram)."
+        },
+        "webhook": {
+          "$ref": "#/definitions/provider_set",
+          "description": "Outgoing webhook providers (e.g. generic)."
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Storage module. Credentials are environment variables: KIRAK_STORAGE_<INSTANCE>_<FIELD>.",
+      "properties": {
+        "default_provider": {
+          "$ref": "#/definitions/default_provider"
+        },
+        "providers": {
+          "$ref": "#/definitions/providers",
+          "description": "Storage provider instances (types local, aws, wasabi, r2, spaces, cubbit, ovh, b2, gcs, azure, or a custom type), by instance name."
+        },
+        "image_allowed_types": {
+          "type": "string",
+          "description": "Allowed image extensions, comma-separated. Default \"jpg,jpeg,png,webp,gif\". svg is refused: store vector files with upload_file."
+        },
+        "image_max_size": {
+          "type": "string",
+          "description": "Maximum image upload size, e.g. \"5mb\". Default \"5mb\"."
+        },
+        "image_compress_quality": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "JPEG/WebP compression quality. Default 85."
+        },
+        "image_max_width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum stored image width in pixels; larger images are scaled down. Default 2000."
+        },
+        "image_max_height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum stored image height in pixels; larger images are scaled down. Default 2000."
+        },
+        "file_allowed_types": {
+          "type": "string",
+          "description": "Allowed non-image extensions, comma-separated. Default \"pdf,doc,docx,xls,xlsx,csv,txt,zip\"."
+        },
+        "file_max_size": {
+          "type": "string",
+          "description": "Maximum file upload size, e.g. \"25mb\". Default \"10mb\"."
+        },
+        "default_thumbnails": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Thumbnails generated for every image upload, e.g. \"sm:100x100,md:300x300\". Default none.",
+          "examples": [
+            "sm:100x100,md:300x300,lg:600x600"
+          ]
+        },
+        "thumbnail_mode": {
+          "type": "string",
+          "enum": [
+            "sync",
+            "background"
+          ],
+          "description": "sync makes thumbnails before responding; background responds first. Default sync."
+        },
+        "signed_url_ttl": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Lifetime in seconds of a signed URL for a private instance when get_url is called without expires. Default 3600 (1 hour)."
+        }
+      }
+    },
+    "scheduler": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Scheduler module. Connection URLs are environment variables: KIRAK_SCHEDULER_<INSTANCE>_URL.",
+      "properties": {
+        "default_provider": {
+          "$ref": "#/definitions/default_provider"
+        },
+        "providers": {
+          "$ref": "#/definitions/providers",
+          "description": "Queue provider instances (types database, redis, rabbitmq, or a custom type), by instance name. At most one database entry."
+        },
+        "poll_interval": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Seconds between queue polls (database and redis providers). Default 5."
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum jobs run in parallel per provider. Default 4."
+        },
+        "default_queue": {
+          "type": "string",
+          "description": "Queue used when enqueue() is given none. Always consumed. Default \"default\"."
+        },
+        "queues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "uniqueItems": true,
+          "description": "Extra queues to consume besides default_queue. Default []."
+        },
+        "job_timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Seconds a job may run before the worker stops and retries it. Default 3600."
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Default maximum retry attempts per job. Default 3."
+        },
+        "retry_backoff": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Base delay between retries in seconds, multiplied by the attempt number. Default 60."
+        },
+        "job_retention_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days a finished (done or failed) job is kept before it is removed: database rows by a daily cleanup, Redis job records by an expiry. 0 keeps them forever. Pending, running and retrying jobs are never removed. Default 7."
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Monitoring module: request metrics and captured logs, written to a local SQLite file, to stdout, or both.",
+      "properties": {
+        "sinks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "sqlite",
+              "stdout"
+            ]
+          },
+          "description": "Where records are written. \"sqlite\": the local metrics file, which the query endpoints and alerts read. \"stdout\": one JSON line per record, for the platform's log collector on stateless instances. Default [\"sqlite\"]."
+        },
+        "db_path": {
+          "type": "string",
+          "description": "Path of the SQLite metrics file (sqlite sink only). Default \"var/kirak/metrics.db\"."
+        },
+        "batch_interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Seconds between writes of collected data. Default 5."
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Days metrics are kept (sqlite sink only). Default 7."
+        },
+        "sample_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Share of requests whose per-operation timings (request steps) are recorded, from 0 to 1; every request itself is recorded. Default 1.0."
+        },
+        "slow_request_threshold_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Operations taking at least this many milliseconds have their timing recorded whatever sample_rate. Default 500."
+        },
+        "max_db_size_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Size cap of the metrics file in megabytes (sqlite sink only). Default 200."
+        },
+        "queue_max_size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum records (requests, audit, AI) waiting in memory to be written. Default 10000."
+        },
+        "log_capture_level": {
+          "type": "string",
+          "enum": [
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "ERROR",
+            "CRITICAL"
+          ],
+          "description": "Lowest level of captured log records. Default WARNING."
+        },
+        "log_queue_max_size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum log records waiting to be written. Default 5000."
+        }
+      }
+    },
+    "ai": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "AI module. API keys are read by each provider's SDK from its standard environment variable (e.g. OPENAI_API_KEY).",
+      "properties": {
+        "default_model": {
+          "type": "string",
+          "description": "\"provider:model\" used when an agent or call names no model.",
+          "examples": [
+            "openai:gpt-4o-mini",
+            "anthropic:claude-haiku-4-5-20251001"
+          ]
+        },
+        "conversation_ttl_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "Seconds a saved agent conversation is kept. Default 3600."
+        },
+        "compaction_token_threshold": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Token count at which a long conversation is compacted. null turns compaction off. Default 150000."
+        },
+        "request_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Read timeout in seconds for each model-provider call. A hung provider fails after this instead of hanging. Default 60."
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Integrations module: users connect their own accounts (OAuth 2) or save API keys. Every call names its integration, so there is no default_provider. Secrets are environment variables: KIRAK_INTEGRATION_<INSTANCE>_<FIELD>. Stored tokens need KIRAK_AUTH_ENCRYPTION_KEYS.",
+      "properties": {
+        "providers": {
+          "$ref": "#/definitions/integration_providers",
+          "description": "Integration instances (types oauth2, api_key), by name. type may be left out when the instance names a profile."
+        }
+      }
+    },
+    "payments": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Payments module. Secrets are environment variables: KIRAK_PAYMENT_<INSTANCE>_<FIELD>.",
+      "properties": {
+        "default_provider": {
+          "$ref": "#/definitions/default_provider"
+        },
+        "providers": {
+          "$ref": "#/definitions/providers",
+          "description": "Payment provider instances (types stripe, stripe_connect, razorpay, square, or a custom type), by instance name."
+        },
+        "success_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Redirect after a successful payment. Each provider instance can override it."
+        },
+        "cancel_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Redirect after a cancelled payment. Each provider instance can override it."
+        },
+        "require_auth": {
+          "type": "boolean",
+          "description": "Require a signed-in caller on the payment routes. false allows guest checkout. Default true."
+        }
+      }
+    },
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Vector module: two independent provider sets. Secrets are environment variables: KIRAK_VECTOR_STORE_<INSTANCE>_<FIELD> and KIRAK_VECTOR_EMBEDDING_<INSTANCE>_<FIELD>.",
+      "properties": {
+        "store": {
+          "$ref": "#/definitions/provider_set",
+          "description": "Vector store providers (e.g. pinecone, s3_vectors)."
+        },
+        "embedding": {
+          "$ref": "#/definitions/provider_set",
+          "description": "Embedding providers (e.g. openai, google, ollama)."
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Free-form settings for the project's own hooks, available as kirak.manifest.hooks."
+    },
+    "custom": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Free-form project settings, available as kirak.manifest.custom.",
+      "examples": [
+        {
+          "feature_flag_new_checkout": true
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "default_provider": {
+      "type": "string",
+      "description": "Instance name used when a call names no provider. Must be one of the instances under providers."
+    },
+    "providers": {
+      "type": "object",
+      "description": "Provider instances by instance name. Names are lowercase letters, digits and _, starting with a letter; they become part of the instance's environment variable names. Secrets never go here.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "description": "One provider instance: its type and the type's non-secret settings.",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Provider type, e.g. stripe or aws_ses. Third-party packages can add types."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "integration_providers": {
+      "type": "object",
+      "description": "Integration instances by instance name, like providers, except that type may be left out when the instance names a profile: the profile's auth.type supplies it.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "description": "One integration: a profile, or a type with its own URLs, plus non-secret settings.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "oauth2 or api_key. Optional with a profile, which sets it; if given, it must match the profile. Without a profile it is required (integration_type_missing)."
+          },
+          "profile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A bundled profile, or integrations/<name>.json."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "provider_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A set of provider instances and the default one. Leave the set out to make it unavailable.",
+      "properties": {
+        "default_provider": {
+          "$ref": "#/definitions/default_provider"
+        },
+        "providers": {
+          "$ref": "#/definitions/providers"
+        }
+      },
+      "examples": [
+        {
+          "default_provider": "ses",
+          "providers": {
+            "ses": {
+              "type": "aws_ses",
+              "aws_region": "us-east-1"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "x-kirak-version": "0.1.2"
+}

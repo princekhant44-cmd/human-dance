@@ -1,0 +1,569 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kirak model",
+  "description": "One model: its database table, fields and who may call each operation. The value of one key in models.json, or the whole content of one file in a models/ directory (the file name is the model name).",
+  "type": "object",
+  "required": [
+    "table",
+    "schema"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Points editors at this schema. Kirak ignores it when loading."
+    },
+    "table": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+      "description": "Database table name. A plain SQL identifier: letters, digits and _, not starting with a digit.",
+      "examples": [
+        "blog_posts"
+      ]
+    },
+    "schema": {
+      "$ref": "#/definitions/fields",
+      "description": "The model's fields, by name. id, created_at, updated_at and deleted_at are added by Kirak and must not be listed."
+    },
+    "internal": {
+      "type": "boolean",
+      "description": "When true, no CRUD routes are generated. The table still exists; use it for tables that must not be exposed over HTTP. Default false."
+    },
+    "soft_delete": {
+      "type": "boolean",
+      "description": "When true, delete sets deleted_at instead of removing the row, and every read excludes deleted rows. Default false."
+    },
+    "id_type": {
+      "type": "string",
+      "enum": [
+        "integer",
+        "uuid"
+      ],
+      "description": "Type of the id primary key: an auto-increment integer, or a UUID Kirak generates (CHAR(36)). Default integer."
+    },
+    "max_limit": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Most rows one fetch or search returns. Default 1000."
+    },
+    "default_order": {
+      "type": "string",
+      "description": "Field names (comma-separated) reads sort by when the caller passes no order_by."
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL segment of the model's routes, e.g. \"articles\" mounts /articles/fetch. Defaults to the model name.",
+      "examples": [
+        "articles"
+      ]
+    },
+    "access": {
+      "type": "object",
+      "description": "Who may call each operation, with optional row-level conditions. When present, access is denied by default: an operation that is not listed returns 403. Keys are operation names (fetch, search, count, exists, create, update, upsert, delete, destroy, restore); the special key \"fields\" holds field-level read/write rules.",
+      "propertyNames": {
+        "enum": [
+          "fetch",
+          "search",
+          "count",
+          "exists",
+          "create",
+          "update",
+          "upsert",
+          "delete",
+          "destroy",
+          "restore",
+          "fields"
+        ]
+      },
+      "properties": {
+        "fields": {
+          "type": "object",
+          "description": "Field-level security, by field name. A listed field is readable/writable only by the listed roles; an empty list means nobody. Fields not listed are unrestricted.",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Roles allowed to read and write one field.",
+            "properties": {
+              "read": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Roles that may read the field. Empty list: nobody."
+              },
+              "write": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Roles that may write the field. Empty list: nobody."
+              },
+              "write_error": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A create, update or upsert that sends this field from a role that may not write it is refused with 400 VALIDATION_ERROR and this message, instead of the field being skipped. Use it to point callers to the flow that does change the field."
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "salary": {
+                "read": [
+                  "admin",
+                  "hr"
+                ],
+                "write": [
+                  "admin"
+                ]
+              },
+              "ssn": {
+                "read": [],
+                "write": []
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "description": "Rules for one operation. A caller is allowed when any rule matches its role (and its condition, if any).",
+        "items": {
+          "$ref": "#/definitions/access_rule"
+        }
+      },
+      "examples": [
+        {
+          "fetch": [
+            {
+              "role": "*"
+            }
+          ],
+          "create": [
+            {
+              "role": "user"
+            }
+          ],
+          "update": [
+            {
+              "role": "user",
+              "condition": "user_id = {user_id}"
+            },
+            {
+              "role": "admin"
+            }
+          ],
+          "delete": [
+            {
+              "role": "admin"
+            }
+          ]
+        }
+      ]
+    },
+    "rate_limit": {
+      "type": "object",
+      "description": "Per-model API rate limiting. Three forms: flat, applying to every operation ({\"max_requests\": 100, \"window_seconds\": 60, \"per\": \"ip\"}); per operation, with \"default\" as the fallback ({\"default\": {...}, \"create\": {...}}); or opt-out ({\"enabled\": false}). Absent or {} inherits the kirak.json default. Do not mix the flat and per-operation forms.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false turns rate limiting off for this model. Absent or true keeps it on."
+        },
+        "max_requests": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Flat form: requests allowed per window. Required when any flat key is set."
+        },
+        "window_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Flat form: length of the window, in seconds."
+        },
+        "per": {
+          "type": "string",
+          "enum": [
+            "ip",
+            "user",
+            "model"
+          ],
+          "description": "Flat form: what the counter is kept per: the client IP, the signed-in user, or the whole model."
+        },
+        "default": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for operations without their own entry."
+        },
+        "fetch": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for fetch."
+        },
+        "search": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for search."
+        },
+        "count": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for count."
+        },
+        "exists": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for exists."
+        },
+        "create": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for create."
+        },
+        "update": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for update."
+        },
+        "upsert": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for upsert."
+        },
+        "delete": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for delete."
+        },
+        "destroy": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for destroy."
+        },
+        "restore": {
+          "$ref": "#/definitions/rate_limit_rule",
+          "description": "Per-operation form: limit for restore."
+        }
+      },
+      "examples": [
+        {
+          "max_requests": 30,
+          "window_seconds": 60,
+          "per": "user"
+        },
+        {
+          "default": {
+            "max_requests": 100,
+            "window_seconds": 60
+          },
+          "create": {
+            "max_requests": 10,
+            "window_seconds": 60,
+            "per": "user"
+          }
+        },
+        {
+          "enabled": false
+        }
+      ]
+    },
+    "cache": {
+      "type": "object",
+      "description": "Per-model Redis caching of fetch, search, count and exists. Model-level only. Absent inherits kirak.json's cache settings; needs KIRAK_REDIS_URL.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "true caches this model's reads; false opts out even when kirak.json enables caching. Absent inherits kirak.json's cache.enabled."
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Seconds a cached result is served before the database is queried again. Absent inherits kirak.json's cache.default_ttl_seconds."
+        }
+      },
+      "examples": [
+        {
+          "enabled": true,
+          "ttl_seconds": 60
+        }
+      ]
+    },
+    "indexes": {
+      "type": "array",
+      "description": "Database indexes beyond the automatic primary key and unique-field indexes. Each entry creates one CREATE INDEX or CREATE UNIQUE INDEX statement. Use for columns that appear in WHERE clauses, access conditions, or ORDER BY but do not need a uniqueness constraint.",
+      "items": {
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+            },
+            "description": "Column names to index, in order. One entry for a single-column index; two or more for a composite index."
+          },
+          "unique": {
+            "type": "boolean",
+            "description": "If true, CREATE UNIQUE INDEX is emitted. For single-column uniqueness, prefer unique: true on the field (it also enforces uniqueness at the application level)."
+          }
+        }
+      },
+      "examples": [
+        [
+          {
+            "columns": [
+              "user_id"
+            ]
+          }
+        ],
+        [
+          {
+            "columns": [
+              "user_id",
+              "status"
+            ]
+          },
+          {
+            "columns": [
+              "email"
+            ],
+            "unique": true
+          }
+        ]
+      ]
+    }
+  },
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+      "description": "A plain SQL identifier: letters, digits and _, not starting with a digit."
+    },
+    "fields": {
+      "type": "object",
+      "description": "Field definitions, by field name. Names are plain SQL identifiers.",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/field"
+      }
+    },
+    "field": {
+      "type": "object",
+      "description": "One field: its type and constraints. Unknown properties are rejected, so a misspelled one is not silently ignored.",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "float",
+            "boolean",
+            "timestamp",
+            "datetime",
+            "date",
+            "decimal",
+            "json",
+            "text",
+            "uuid",
+            "email",
+            "file",
+            "image",
+            "multiselect"
+          ],
+          "description": "Data type. string VARCHAR(max_length, default 255); text TEXT; integer; float; decimal DECIMAL(precision, scale); boolean; timestamp; datetime; date; uuid (a UUID, stored and returned as a 36-character string); json (object or list); email (validated address); file and image (a path or URL); multiselect (a list, stored as JSON)."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Reject create and update when the field is missing or null. Default false."
+        },
+        "unique": {
+          "type": "boolean",
+          "description": "Reject a create or update that would duplicate an existing value. Default false."
+        },
+        "searchable": {
+          "type": "boolean",
+          "description": "Include the field in search queries. Only string, text and email fields are searched. Default false."
+        },
+        "sortable": {
+          "type": "boolean",
+          "description": "Allow the field in order_by. Default true; with false, a request that sorts by it is refused (400)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable name used in validation error messages instead of the field key."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the field holds. Shown in the error message when pattern does not match."
+        },
+        "primary_key": {
+          "type": "boolean",
+          "description": "Mark the field as the primary key. Only for custom primary keys; Kirak adds id by default."
+        },
+        "auto_increment": {
+          "type": "boolean",
+          "description": "Make a custom integer primary key AUTO_INCREMENT (MySQL) or SERIAL (PostgreSQL)."
+        },
+        "default": {
+          "description": "Value used when a create request leaves the field out."
+        },
+        "enum": {
+          "type": "array",
+          "items": {},
+          "description": "Allowed values. Anything else is rejected on create and update; on a multiselect field every item must be one of them.",
+          "examples": [
+            [
+              "draft",
+              "published",
+              "archived"
+            ]
+          ]
+        },
+        "values": {
+          "type": "array",
+          "items": {},
+          "description": "Informational list of values. Not enforced; use enum to restrict values."
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum length of a string or email value. Default 255."
+        },
+        "min_length": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "string only: minimum length of the value."
+        },
+        "pattern": {
+          "type": "string",
+          "description": "string only: regular expression the value must match from its start (Python re.match).",
+          "examples": [
+            "^[A-Z]{2}-[0-9]{4}$"
+          ]
+        },
+        "min_value": {
+          "type": "number",
+          "description": "integer and float only: smallest allowed value."
+        },
+        "max_value": {
+          "type": "number",
+          "description": "integer and float only: largest allowed value."
+        },
+        "on_update": {
+          "enum": [
+            "CURRENT_TIMESTAMP"
+          ],
+          "description": "CURRENT_TIMESTAMP sets the field to the current time on every create and update."
+        },
+        "precision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "decimal only: total number of digits, e.g. 10 in DECIMAL(10, 2)."
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "decimal only: digits after the decimal point, e.g. 2 in DECIMAL(10, 2). Must not exceed precision."
+        },
+        "foreign_key": {
+          "type": "boolean",
+          "description": "Marks the field as a reference to another model. Set together with relationship."
+        },
+        "relationship": {
+          "type": "object",
+          "description": "The model and field this foreign key points to. GraphQL uses it to join the related model.",
+          "required": [
+            "model",
+            "foreign_key"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "$ref": "#/definitions/identifier",
+              "description": "Name of the related model."
+            },
+            "foreign_key": {
+              "$ref": "#/definitions/identifier",
+              "description": "Field of the related model this field matches, usually id."
+            }
+          },
+          "examples": [
+            {
+              "model": "users",
+              "foreign_key": "id"
+            }
+          ]
+        }
+      },
+      "examples": [
+        {
+          "type": "string",
+          "required": true,
+          "max_length": 120,
+          "searchable": true
+        },
+        {
+          "type": "decimal",
+          "precision": 10,
+          "scale": 2
+        },
+        {
+          "type": "integer",
+          "required": true,
+          "foreign_key": true,
+          "relationship": {
+            "model": "users",
+            "foreign_key": "id"
+          }
+        }
+      ]
+    },
+    "access_rule": {
+      "type": "object",
+      "description": "One access rule: a role, and optionally a row-level condition.",
+      "required": [
+        "role"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Role the rule applies to, as in the caller's token. \"*\" matches everyone, including callers who are not signed in; an exact role match takes precedence over \"*\"."
+        },
+        "condition": {
+          "type": "string",
+          "description": "Row-level filter: a SQL WHERE fragment whose {placeholders} are filled from the caller's token claims and always sent as parameters. Operators: =, !=, <>, <, >, <=, >=, IS NULL, IS NOT NULL, LIKE, joined by AND or OR. Checked at startup.",
+          "examples": [
+            "user_id = {user_id}",
+            "team_id = {team_id} AND status != 'archived'"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "rate_limit_rule": {
+      "type": "object",
+      "description": "A rate limit for one operation.",
+      "additionalProperties": false,
+      "properties": {
+        "max_requests": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Requests allowed per window. Required."
+        },
+        "window_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Length of the window, in seconds."
+        },
+        "per": {
+          "type": "string",
+          "enum": [
+            "ip",
+            "user",
+            "model"
+          ],
+          "description": "What the counter is kept per: the client IP, the signed-in user, or the whole model."
+        }
+      }
+    }
+  },
+  "x-kirak-version": "0.1.2"
+}

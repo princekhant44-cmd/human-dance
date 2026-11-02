@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kirak tool declarations",
+  "description": "The \"tools\" map of a Kirak config file that offers tools to a model (MCP server files; agent files). Each key is the tool name the model sees: 1 to 64 letters, digits, _ or -. Each value holds the tool options; \"operation\" is required and names the Kirak operation to run. Python function tools are registered in code, not here.",
+  "type": "object",
+  "propertyNames": {
+    "pattern": "^[A-Za-z0-9_-]{1,64}$",
+    "x-kirak-errors": {
+      "pattern": "a tool key must be a name the model sees: 1 to 64 letters, digits, _ or -, e.g. \"orders_fetch\" or \"refund\"."
+    }
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/tool"
+  },
+  "examples": [
+    {
+      "orders_fetch": {
+        "operation": "orders.fetch"
+      },
+      "refund": {
+        "operation": "payments.refund_payment",
+        "requires_confirmation": true
+      },
+      "list_commits": {
+        "operation": "integrations.get",
+        "fixed": {
+          "integration": "github",
+          "path": "/repos/{owner}/{repo}/commits"
+        },
+        "params": {
+          "owner": {
+            "pattern": "^[A-Za-z0-9-]+$"
+          }
+        }
+      },
+      "search_orders": {
+        "operation": "graphql",
+        "fixed": {
+          "query": "query Orders($status: String) { orders(status: $status) { id total } }"
+        },
+        "params": {
+          "status": {
+            "enum": [
+              "pending",
+              "paid"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "tool": {
+      "type": "object",
+      "description": "The options of one tool.",
+      "additionalProperties": false,
+      "required": [
+        "operation"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\.[a-z_][a-z0-9_]*|graphql)$",
+          "description": "The Kirak operation to run: \"<model>.<crud_op>\", \"<module>.<op>\", or \"graphql\".",
+          "x-kirak-errors": {
+            "pattern": "operation must be \"<model>.<crud_op>\", \"<module>.<op>\", or \"graphql\"."
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the tool does and when to use it, written for the model. Default: the model's or the module operation's own description."
+        },
+        "requires_confirmation": {
+          "type": "boolean",
+          "description": "A human approves each call before it runs. Default: derived from the operation effect (write/destructive -> true, read -> false)."
+        },
+        "timeout": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Seconds the tool may run."
+        },
+        "fixed": {
+          "type": "object",
+          "description": "Values the model cannot change. Removed from the model's visible input schema and merged into the call at runtime.",
+          "additionalProperties": true
+        },
+        "params": {
+          "type": "object",
+          "description": "JSON Schema constraints added on top of the parameters the model still fills. A key must not appear in both fixed and params.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enum": {
+                "type": "array",
+                "description": "The only values the model may pass."
+              },
+              "minimum": {
+                "type": "number",
+                "description": "Smallest number allowed."
+              },
+              "maximum": {
+                "type": "number",
+                "description": "Largest number allowed."
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Regular expression a string must match."
+              },
+              "minLength": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Fewest characters in a string."
+              },
+              "maxLength": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Most characters in a string."
+              },
+              "format": {
+                "type": "string",
+                "description": "JSON Schema format of a string, e.g. \"email\" or \"date-time\"."
+              },
+              "maxItems": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Most items in an array."
+              }
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "description": "MCP server files: JSON Schema of the result's data, for operations whose result depends on the provider (payments, notifications, storage, ...). It becomes the tool's outputSchema, and every result is checked against it: one that does not match is an OUTPUT_SCHEMA_MISMATCH error. Best with fixed.provider, so one provider's shape comes back. Agent files ignore it."
+        }
+      }
+    }
+  },
+  "x-kirak-version": "0.1.2"
+}

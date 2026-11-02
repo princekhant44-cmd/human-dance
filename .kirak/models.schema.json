@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kirak models.json",
+  "description": "All models of a Kirak project, by model name. A project either has one models.json or a models/ directory with one file per model (each validated by model.schema.json).",
+  "type": "object",
+  "propertyNames": {
+    "pattern": "^([a-zA-Z_][a-zA-Z0-9_]*|\\$schema)$",
+    "description": "Model names are plain SQL identifiers: letters, digits and _, not starting with a digit."
+  },
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Points editors at this schema. Kirak ignores it when loading."
+    }
+  },
+  "additionalProperties": {
+    "$ref": "model.schema.json"
+  },
+  "x-kirak-version": "0.1.2"
+}

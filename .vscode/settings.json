@@ -1,0 +1,28 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "/kirak.json"
+      ],
+      "url": "./.kirak/manifest.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/models/*.json"
+      ],
+      "url": "./.kirak/model.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/agents/*.json"
+      ],
+      "url": "./.kirak/agent.schema.json"
+    },
+    {
+      "fileMatch": [
+        "/mcp/*.json"
+      ],
+      "url": "./.kirak/mcp.schema.json"
+    }
+  ]
+}

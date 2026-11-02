@@ -1,0 +1,104 @@
+{
+  "$schema": "./.kirak/manifest.schema.json",
+  "version": "1.0.0",
+  "title": "human-dance",
+  "log_level": "INFO",
+  "log_path": "logs",
+  "hook_timeout_seconds": 5.0,
+  "project_name": "human-dance",
+  "base_url": "http://localhost:8000",
+  "modules": [],
+  "database": {
+    "type": "sqlite",
+    "name": "human_dance.db",
+    "pool_min": 1,
+    "pool_max": 10
+  },
+  "cors": {
+    "enabled": true,
+    "allow_credentials": true,
+    "allow_methods": [
+      "*"
+    ],
+    "allow_headers": [
+      "*"
+    ],
+    "origins": [
+      "http://localhost:3000",
+      "http://localhost:5173"
+    ]
+  },
+  "auth": {
+    "jwt_algorithm": "HS256",
+    "access_token_expire_hours": 1,
+    "refresh_token_expire_days": 14,
+    "cookie_name": "",
+    "cookie_domain": "",
+    "social_providers": []
+  },
+  "rate_limit": {
+    "enabled": true,
+    "default_max_requests": 100,
+    "default_window_seconds": 60
+  },
+  "notifications": {
+    "email_from_address": null,
+    "email_from_name": null,
+    "email": {
+      "default_provider": "ses",
+      "providers": {
+        "ses": {
+          "type": "aws_ses",
+          "aws_region": "us-east-1"
+        }
+      }
+    }
+  },
+  "storage": {
+    "default_provider": "local",
+    "providers": {
+      "local": {
+        "type": "local",
+        "upload_dir": "uploads"
+      }
+    },
+    "image_allowed_types": "jpg,jpeg,png,webp,gif",
+    "image_max_size": "5mb",
+    "file_allowed_types": "pdf,doc,docx,xls,xlsx,csv,txt,zip",
+    "file_max_size": "10mb"
+  },
+  "scheduler": {
+    "default_provider": "db",
+    "providers": {
+      "db": {
+        "type": "database"
+      }
+    },
+    "poll_interval": 5,
+    "concurrency": 10
+  },
+  "monitoring": {
+    "db_path": "var/kirak/metrics.db",
+    "batch_interval_seconds": 5,
+    "retention_days": 7,
+    "sample_rate": 1.0,
+    "slow_request_threshold_ms": 500,
+    "max_db_size_mb": 200,
+    "queue_max_size": 10000,
+    "log_capture_level": "WARNING",
+    "log_queue_max_size": 5000
+  },
+  "ai": {
+    "default_model": "openai:gpt-4o"
+  },
+  "payments": {
+    "default_provider": "stripe",
+    "providers": {
+      "stripe": {
+        "type": "stripe"
+      }
+    },
+    "success_url": null,
+    "cancel_url": null
+  }
+}

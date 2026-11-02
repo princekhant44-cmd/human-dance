@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "status": "drafting",
+  "app": {
+    "name": "human-dance",
+    "description": "",
+    "phase": "mvp"
+  },
+  "roles": [],
+  "entities": [],
+  "modules": [],
+  "confirmed_assumptions": [],
+  "not_building": [],
+  "planned_models": [],
+  "planned_hooks": []
+}

@@ -1,0 +1,14 @@
+.env
+kirak.local.json
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+migrations/models_snapshot.json
+*.db
+*.db-wal
+*.db-shm

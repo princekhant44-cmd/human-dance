@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kirak agent",
+  "description": "One agent, defined in a JSON file in the project's agents/ directory. Kirak loads every file there at startup and adds run, resume and metadata endpoints for each agent. Python function tools are registered in code with @kirak.agent(\"<name>\").tool, not here.",
+  "type": "object",
+  "required": [
+    "name",
+    "model"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Points editors at this schema. Kirak ignores it when loading."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Agent name: lowercase letters, digits and hyphens, starting with a letter. Used in the agent's routes and in @kirak.agent(\"<name>\"). Must be unique.",
+      "x-kirak-errors": {
+        "pattern": "'name' must be lowercase letters, digits, and hyphens, starting with a letter."
+      },
+      "examples": [
+        "customer-support"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the agent does. Shown in the GET /ai/agents listing."
+    },
+    "model": {
+      "type": "string",
+      "pattern": "^[^:\\s]+:\\S.*$",
+      "description": "pydantic-ai model as \"provider:name\". The provider's pip extra must be installed (e.g. kirak[ai-openai]).",
+      "x-kirak-errors": {
+        "pattern": "'model' must be 'provider:name' format, e.g. \"openai:gpt-4o-mini\"."
+      },
+      "examples": [
+        "openai:gpt-4o-mini",
+        "anthropic:claude-haiku-4-5-20251001",
+        "google:gemini-2.0-flash"
+      ]
+    },
+    "instructions": {
+      "type": "string",
+      "description": "System prompt. Either this or instructions_file is required."
+    },
+    "instructions_file": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path of a text or Markdown file holding the system prompt, relative to this agent file. YAML frontmatter (--- ... ---) is removed. Used instead of instructions when both are set.",
+      "examples": [
+        "customer-support.md"
+      ]
+    },
+    "tools": {
+      "$ref": "tools.schema.json",
+      "description": "Tools the agent may call. Each key is a lowercase ref (\"customer.fetch\"); each value holds the tool options. Default {}."
+    },
+    "input_schema": {
+      "type": "object",
+      "description": "JSON Schema the request body of the agent's run endpoint is validated against before the model is called. Default {} (no check)."
+    },
+    "output_schema": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$",
+      "description": "Dotted import path of a Pydantic class the agent's output must match, e.g. \"app.schemas.Answer\". When set, the output is a validated object instead of text.",
+      "examples": [
+        "app.schemas.Answer"
+      ]
+    },
+    "conversation": {
+      "type": "boolean",
+      "description": "Keep message history across calls so a conversation can continue. Default true."
+    },
+    "max_turns": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum model turns in one run before it stops. Default 10."
+    },
+    "max_budget_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "exclusiveMinimum": 0,
+      "description": "Cost cap for one run, in US dollars. Enforced before each LLM turn and after the run; exceeding it raises USAGE_LIMIT_EXCEEDED (429). Default none."
+    },
+    "require_tool_use": {
+      "type": "boolean",
+      "description": "Fail the run when the agent calls no tool. Default false."
+    },
+    "access": {
+      "type": "string",
+      "enum": [
+        "Guest",
+        "User",
+        "Admin",
+        "System"
+      ],
+      "description": "Who may call the agent's endpoints: Guest (anyone, no sign-in), User (any signed-in caller), Admin, or System. Default User.",
+      "x-kirak-errors": {
+        "enum": "'access' must be one of: Admin, Guest, System, User."
+      }
+    },
+    "rate_limit_per_minute": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Requests per minute allowed to this agent's endpoints. Default 60."
+    },
+    "goal_condition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Python expression over result / output. When set, the agent runs again (up to max_iterations) until it is true. Needs reviewer_model.",
+      "examples": [
+        "len(output) > 200"
+      ]
+    },
+    "max_iterations": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum runs while goal_condition is not met. Default 1."
+    },
+    "reviewer_model": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[^:\\s]+:\\S.*$",
+      "description": "\"provider:name\" model that scores the output against quality_rubric.",
+      "x-kirak-errors": {
+        "pattern": "'reviewer_model' must be 'provider:name' format, e.g. \"openai:gpt-4o-mini\"."
+      }
+    },
+    "quality_rubric": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Rubric the reviewer model scores the output against."
+    },
+    "quality_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "description": "Minimum reviewer score, 0 to 3. A lower score fails the run with QUALITY_FAILED. Default 2."
+    },
+    "temperature": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Sampling temperature; 0 is the most deterministic. Default: the provider's."
+    },
+    "toolsets": {
+      "type": "object",
+      "description": "MCP servers whose tools this agent may call. Each key is a server name (lowercase letters, digits and _). A key with no 'url' names a Kirak-own server (mcp/<name>.json must exist); a key with 'url' names an external server. Auth tokens are environment variables (KIRAK_AI_TOOLSET_{NAME}_TOKEN), never here.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$",
+        "x-kirak-errors": {
+          "pattern": "a toolset key must be lowercase letters, digits and _, starting with a letter."
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "HTTP(S) URL of an external MCP server. Omit for a Kirak-own server."
+          }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "goal_condition": [
+      "reviewer_model"
+    ]
+  },
+  "if": {
+    "not": {
+      "required": [
+        "instructions"
+      ]
+    }
+  },
+  "then": {
+    "required": [
+      "instructions_file"
+    ],
+    "x-kirak-errors": {
+      "required": "requires either 'instructions' or 'instructions_file'."
+    }
+  },
+  "x-kirak-errors": {
+    "dependencies": "'goal_condition' requires 'reviewer_model'."
+  },
+  "x-kirak-version": "0.1.2"
+}

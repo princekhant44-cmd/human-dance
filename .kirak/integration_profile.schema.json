@@ -1,0 +1,1370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "integration_profile.schema.json",
+  "title": "Integration profile",
+  "description": "One service's facts for the integrations module: where it authorizes, where its API lives, how to learn who connected, and its quirks. A profile is data only. Bundled profiles live in kirak/integrations/profiles/; a project adds its own as integrations/<name>.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "name",
+    "title",
+    "docs_url",
+    "auth",
+    "api"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": 1,
+      "description": "The version of this format. Only 1 exists."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+      "description": "The profile's name, used as kirak.json \"profile\" and as the file name."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "The service's display name."
+    },
+    "website": {
+      "type": "string",
+      "pattern": "^https://",
+      "description": "The service's home page."
+    },
+    "docs_url": {
+      "type": "string",
+      "pattern": "^https://",
+      "description": "The vendor documentation the facts were checked against."
+    },
+    "auth": {
+      "type": "object",
+      "description": "How the app authenticates: the type, the endpoints, and where the token sits in the response.",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "dependencies": {
+        "revoke": [
+          "revoke_url"
+        ]
+      },
+      "if": {
+        "required": [
+          "token_auth"
+        ],
+        "properties": {
+          "token_auth": {
+            "const": "private_key_jwt"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "jwt"
+        ]
+      },
+      "properties": {
+        "type": {
+          "enum": [
+            "oauth2",
+            "api_key"
+          ],
+          "description": "oauth2 for a user's own account; api_key for one app key or one key per user."
+        },
+        "authorize_url": {
+          "$ref": "#/definitions/endpoint",
+          "description": "The authorize endpoint. May hold {settings.x}, {connect.x} or {connection.x}."
+        },
+        "token_url": {
+          "$ref": "#/definitions/endpoint",
+          "description": "The token endpoint. May hold placeholders, and a {connection.x} value from the callback or the connect call (Zoho's data center); when that value is the whole host, its pattern must list the allowed hosts."
+        },
+        "refresh_url": {
+          "$ref": "#/definitions/endpoint",
+          "description": "The refresh endpoint. Defaults to token_url."
+        },
+        "revoke_url": {
+          "$ref": "#/definitions/endpoint",
+          "description": "The revoke endpoint, when the service has one. Alone, it means the RFC 7009 request: POST a form with token and token_type_hint, the client authenticated as token_auth says. May hold {client_id} in its path (GitHub)."
+        },
+        "revoke": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How a service that does not follow RFC 7009 revokes a token at disconnect. Every field is optional; the defaults are the RFC 7009 request. The token is never put in the URL.",
+          "properties": {
+            "method": {
+              "enum": [
+                "POST",
+                "DELETE"
+              ],
+              "description": "HTTP method. Default POST."
+            },
+            "client_auth": {
+              "enum": [
+                "basic",
+                "body",
+                "none"
+              ],
+              "description": "How the client id and secret go: HTTP Basic, in the body, or not at all. Default: as token_auth."
+            },
+            "credential": {
+              "enum": [
+                "bearer"
+              ],
+              "description": "bearer: the token itself authorizes the call, in Authorization: Bearer (Dropbox, Slack). Then the body does not carry it."
+            },
+            "format": {
+              "enum": [
+                "form",
+                "json",
+                "none"
+              ],
+              "description": "How the body is sent: form (default), json, or no body (with credential bearer)."
+            },
+            "token_param": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The body field that holds the token. Default token."
+            },
+            "token": {
+              "enum": [
+                "access",
+                "refresh"
+              ],
+              "description": "Which token to revoke. Default: the refresh token when the connection has one, else the access token."
+            }
+          },
+          "if": {
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "credential"
+            ]
+          }
+        },
+        "authorize_params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra query parameters on the authorize URL, such as access_type or prompt."
+        },
+        "grants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "authorization_code",
+              "client_credentials"
+            ]
+          },
+          "description": "The grants the service supports for this profile: authorization_code (a user connects; the default) and client_credentials (an app-level token, no user). An instance chooses one with grant in kirak.json."
+        },
+        "token_params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra fields on the code exchange (the token request at connect), such as Shopify's expiring. They cannot replace the grant's own fields."
+        },
+        "refresh_params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra fields on the refresh request. They cannot replace the grant's own fields."
+        },
+        "pkce": {
+          "type": "boolean",
+          "description": "Use S256 PKCE. Set it when the service documents it; without a value the default is true."
+        },
+        "token_auth": {
+          "enum": [
+            "basic",
+            "body",
+            "private_key_jwt"
+          ],
+          "description": "How the client proves itself at the token endpoint: basic (default) or body send the client id and secret; private_key_jwt sends a JWT signed with the app's private key (KIRAK_INTEGRATION_<NAME>_PRIVATE_KEY), as auth.jwt describes."
+        },
+        "jwt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm"
+          ],
+          "description": "For token_auth private_key_jwt: the JWT the client signs. Sent as client_assertion (RFC 7523) by default, or as the client_secret itself (Apple). Claim and header values may hold {client_id}, {token_url} (the token endpoint being called) and {settings.x}.",
+          "properties": {
+            "as": {
+              "enum": [
+                "client_assertion",
+                "client_secret"
+              ],
+              "description": "client_assertion (default): sent with client_assertion_type jwt-bearer, signed per request with a jti. client_secret: sent as the client_secret, reused until near its expiry (Apple)."
+            },
+            "algorithm": {
+              "enum": [
+                "ES256",
+                "ES384",
+                "RS256",
+                "PS256"
+              ],
+              "description": "The signing algorithm; the private key must fit it (EC for ES*, RSA for RS* and PS*)."
+            },
+            "lifetime": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 15777000,
+              "description": "Seconds the JWT is valid. Default 300; Apple allows up to six months."
+            },
+            "claims": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "The claims, as templates. Default for client_assertion: iss and sub {client_id}, aud {token_url}. iat and exp are added, and jti for client_assertion."
+            },
+            "header": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Extra JWT header fields, as templates, such as kid: {settings.key_id}."
+            }
+          }
+        },
+        "check": {
+          "enum": [
+            "code",
+            "client_credentials",
+            "none"
+          ],
+          "description": "How `kirak integrations check` proves the client credentials: code (default) sends a code that cannot be valid, for a service that checks the client before the code; client_credentials sends a client_credentials grant; none means no request proves them (the check reports unverified)."
+        },
+        "token_format": {
+          "enum": [
+            "form",
+            "json"
+          ],
+          "description": "How the token request body is sent. Default form."
+        },
+        "token_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Where the access token sits in the token response, dotted, e.g. authed_user.access_token. Default access_token."
+        },
+        "refresh_token_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Where the refresh token sits in the token response, dotted from the top. Default: refresh_token next to the access token."
+        },
+        "expires_in_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Where the access token's lifetime in seconds sits in the token response, dotted from the top. Default: expires_in next to the access token."
+        },
+        "expires_at_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Where the access token's expiry as a Unix epoch sits in the token response, dotted from the top, for a service that sends a time instead of a lifetime. Used when no lifetime is found."
+        },
+        "scope_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Where the granted scopes sit in the token response, dotted from the top. Default: scope next to the access token."
+        },
+        "refresh_expires_in_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Where the refresh token's lifetime in seconds sits in the token response, dotted from the top (QuickBooks: x_refresh_token_expires_in). Default: refresh_token_expires_in next to the access token."
+        },
+        "refresh_token_lifetime_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3650,
+          "description": "How long a refresh token lasts when the response does not say, counted from each response that returns one (Xero: 60). Without it and without the response field, the expiry is not known."
+        },
+        "scope_param": {
+          "description": "The authorize parameter that carries the scopes: a name such as \"scope\" (default) or \"user_scope\", or false when scopes are set at app registration (Notion).",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z_]+$"
+            },
+            {
+              "const": false
+            }
+          ]
+        },
+        "scope_separator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2,
+          "description": "What separates scopes in the scope parameter. Default a space."
+        },
+        "refresh_rotates": {
+          "type": "boolean",
+          "description": "The service issues a new refresh token on every refresh; the old one must be replaced at once."
+        },
+        "expiry_lookup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "path"
+          ],
+          "description": "When the token response has no expires_in, where to read the expiry: a URL (may hold placeholders) and a dotted JSON path. The value is seconds from now.",
+          "properties": {
+            "url": {
+              "$ref": "#/definitions/endpoint"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+              "description": "Dotted path to the expiry value in that response, in seconds from now."
+            }
+          }
+        },
+        "key": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "in"
+          ],
+          "description": "Where the credential goes: the key (api_key), or the access token (oauth2; default Authorization with the prefix 'Bearer ', Shopify: X-Shopify-Access-Token with no prefix).",
+          "properties": {
+            "in": {
+              "enum": [
+                "header",
+                "query",
+                "basic"
+              ],
+              "description": "Where the key goes: a header, the query string, or HTTP Basic with the key as the user name (BambooHR, Freshdesk)."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The header or query parameter name that carries the key. Required for header and query."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "Text put in front of the key, such as Bearer with a trailing space (header only)."
+            },
+            "password": {
+              "type": "string",
+              "description": "basic only: the fixed password sent with the key, such as X. Default empty."
+            }
+          },
+          "if": {
+            "properties": {
+              "in": {
+                "enum": [
+                  "header",
+                  "query"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "name"
+            ]
+          }
+        }
+      }
+    },
+    "scopes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The scopes the profile asks for by default, the scope that grants a refresh token, and what each known scope means.",
+      "properties": {
+        "default": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Scopes requested when kirak.json does not set scope."
+        },
+        "offline": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A scope that makes the service return a refresh token; always added when the service needs it."
+        },
+        "known": {
+          "type": "object",
+          "description": "What each known scope means, keyed by scope name.",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "satisfied_by": {
+          "type": "object",
+          "description": "For the granted-scope check: a requested scope counts as granted when one of these scopes is, because the service grants it under another name (Google: email as https://www.googleapis.com/auth/userinfo.email) or a wider scope implies it (Shopify: write_products implies read_products).",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Values the app sets in kirak.json under the instance's \"settings\" key, such as a tenant or a shop. Each must have a pattern when a placeholder uses it.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the setting is for."
+          },
+          "default": {
+            "type": "string",
+            "description": "The value used when kirak.json does not set it."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "A regular expression the value must match in full. Required when a placeholder uses the setting."
+          }
+        }
+      }
+    },
+    "connect": {
+      "type": "object",
+      "description": "Values the app passes to the connect call, such as the shop of a Shopify store. Each has a pattern.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pattern",
+          "description"
+        ],
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "A regular expression the value must match in full."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the app passes to the connect call."
+          }
+        }
+      }
+    },
+    "sites": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "id"
+      ],
+      "description": "For a token that reaches several sites, organisations or tenants (Atlassian sites, Xero organisations): the request that lists them. Every site is saved with the connection, the default (else the first) is active, and the app can make another active later; connection values with from site are read from the active one.",
+      "properties": {
+        "url": {
+          "$ref": "#/definitions/endpoint",
+          "description": "The URL that lists the sites, called with the new access token."
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "description": "The HTTP method. Default GET."
+        },
+        "body": {
+          "type": "object",
+          "description": "A JSON body sent with POST. Fixed text: no placeholders are filled in it."
+        },
+        "items_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Dotted path to the list in the response. Default: the response is the list."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Dotted path in a site's item to its id."
+        },
+        "label": {
+          "type": "string",
+          "description": "The site's name shown to users: a dotted path in its item, or a template of paths in braces."
+        },
+        "default": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Dotted path in a site's item to a field that is true for the default site. Without it, or when no site has it, the first is the default."
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "description": "Values saved with the connection and used in its URLs, taken from the token, the callback, the connect call or a request.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from"
+        ],
+        "properties": {
+          "from": {
+            "enum": [
+              "token",
+              "callback",
+              "connect",
+              "request",
+              "site"
+            ],
+            "description": "Where the value comes from: the token, the callback, the connect call, a request, or the connection's active site (path read in the site's item; the profile needs a sites section)."
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+            "description": "Dotted path in the source to read the value from. A step may pick a list item by a field: accounts[is_default=true].base_uri."
+          },
+          "key": {
+            "type": "string",
+            "description": "Name of the query parameter or field to read the value from."
+          },
+          "url": {
+            "$ref": "#/definitions/endpoint"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "For from request: the HTTP method. Default GET."
+          },
+          "body": {
+            "type": "object",
+            "description": "For from request: a JSON body sent with POST, such as a GraphQL query. Fixed text: no placeholders are filled in it."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "A regular expression the value must match in full."
+          }
+        },
+        "dependencies": {
+          "body": {
+            "required": [
+              "method"
+            ],
+            "properties": {
+              "method": {
+                "const": "POST",
+                "description": "A body is sent with POST only."
+              }
+            }
+          }
+        }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from"
+      ],
+      "description": "How to learn who connected: the account id and a label to show.",
+      "properties": {
+        "from": {
+          "enum": [
+            "id_token",
+            "token",
+            "connection",
+            "request"
+          ],
+          "description": "Where the account id comes from: the id token, the token response, the connection, or a request."
+        },
+        "url": {
+          "$ref": "#/definitions/endpoint",
+          "description": "For from request: the endpoint to read the account from."
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "description": "For from request: the HTTP method, POST for a service whose endpoints take POST only (Dropbox). Default GET."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Dotted path to the account id in that source."
+        },
+        "label": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*|[^{}]*(\\{[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*\\}[^{}]*)+)$",
+          "description": "A label for the account shown to users: a dotted path (email), or a template of dotted paths in braces ({first_name} {last_name}). A missing value is left out; an empty label is none."
+        },
+        "body": {
+          "type": "object",
+          "description": "For from request: a JSON body sent with POST, such as a GraphQL query ({\"query\": \"{ viewer { id email } }\"}). Fixed text: no placeholders are filled in it."
+        }
+      },
+      "dependencies": {
+        "body": {
+          "required": [
+            "method"
+          ],
+          "properties": {
+            "method": {
+              "const": "POST",
+              "description": "A body is sent with POST only."
+            }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "description": "Where the service's API lives and what every request carries.",
+      "additionalProperties": false,
+      "required": [
+        "base_url"
+      ],
+      "properties": {
+        "base_url": {
+          "$ref": "#/definitions/endpoint"
+        },
+        "allowed_hosts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Extra hosts the API may call, besides the host of base_url. Entries may use a *. wildcard for subdomains."
+        },
+        "default_headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Headers every request carries, such as an API version."
+        },
+        "errors": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How the service reports a failure, when its HTTP status does not say enough.",
+          "properties": {
+            "code_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Where the service's error name is in the body, as a dotted path. Default: error."
+            },
+            "success_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "For a service that answers 200 for errors: a body field that is true on success, as a dotted path. Anything else is a failure."
+            },
+            "errors_path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "For a service that answers 200 with a list of errors (GraphQL: errors): a body field that is a non-empty list on failure, as a dotted path."
+            },
+            "token_invalid": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Error names that mean the token is no longer good: the call refreshes once, then the user must connect again."
+            },
+            "scope_missing": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Error names that mean the grant lacks a scope: no refresh; the connection check reports it."
+            }
+          }
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "description": "Seconds to wait for one request."
+        }
+      }
+    },
+    "pagination": {
+      "type": "object",
+      "description": "How list responses are paged, so a client can read every page.",
+      "additionalProperties": false,
+      "required": [
+        "style"
+      ],
+      "properties": {
+        "style": {
+          "enum": [
+            "link_header",
+            "cursor",
+            "next_url",
+            "offset",
+            "page"
+          ],
+          "description": "How the next page is found: a Link header, a cursor, a next URL, an offset, or a page number."
+        },
+        "param": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The query parameter that asks for the next page (cursor and page styles). When paginate() is given a body, the body field instead."
+        },
+        "next": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The response field that holds the next cursor or URL."
+        },
+        "size_param": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The query parameter that sets the page size."
+        },
+        "max_size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The largest page size the service allows."
+        },
+        "items_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Dotted path to the list of items in the response body."
+        },
+        "offset_param": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The query parameter that sets the offset (offset style)."
+        },
+        "total": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The response field that holds the total count, when the service reports one."
+        },
+        "more": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "A response field that is true while more pages follow (Dropbox and Notion: has_more). When set, paging stops once it is not true, even if a cursor came back."
+        },
+        "continue_path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Cursor style with a body: the path the following pages are posted to, with only the cursor in the body (Dropbox's /files/list_folder/continue). Without it, the next page goes to the same path with the cursor added to the first body (Notion)."
+        }
+      }
+    },
+    "rate_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the service reports limits: the statuses that mean limited, and the headers that say when to retry.",
+      "not": {
+        "required": [
+          "limits"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "remaining"
+            ]
+          },
+          {
+            "required": [
+              "limit"
+            ]
+          },
+          {
+            "required": [
+              "used_limit"
+            ]
+          },
+          {
+            "required": [
+              "reset"
+            ]
+          },
+          {
+            "required": [
+              "reset_epoch"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "status": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "uniqueItems": true,
+          "description": "HTTP statuses that mean the app is limited."
+        },
+        "retry_after": {
+          "type": "string",
+          "description": "Response header that says how long to wait before retrying."
+        },
+        "remaining": {
+          "type": "string",
+          "description": "Response header with the calls left in the window."
+        },
+        "limit": {
+          "type": "string",
+          "description": "Response header with the call limit of the window."
+        },
+        "used_limit": {
+          "type": "string",
+          "description": "Response header with the calls used and the limit in one value, used/limit (Shopify's X-Shopify-Shop-Api-Call-Limit: 32/40). The calls left are the limit less the used. For a service that sends no remaining and limit headers."
+        },
+        "reset": {
+          "type": "string",
+          "description": "Response header with when the window resets: seconds, a duration (6m0s, 120ms), an HTTP date or an ISO 8601 time."
+        },
+        "reset_epoch": {
+          "type": "string",
+          "description": "Response header with the reset time as a Unix epoch."
+        },
+        "limits": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Several limits reported at once, each with its own headers (OpenAI: requests and tokens). A call is held or refused when any of them is spent. Instead of the section's own remaining / limit / used_limit / reset / reset_epoch.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                "description": "The limit's name, as client.quota and the logs show it: requests, tokens, day."
+              },
+              "remaining": {
+                "type": "string",
+                "description": "Response header with the calls left in the window."
+              },
+              "limit": {
+                "type": "string",
+                "description": "Response header with the call limit of the window."
+              },
+              "used_limit": {
+                "type": "string",
+                "description": "Response header with the calls used and the limit in one value, used/limit (Shopify's X-Shopify-Shop-Api-Call-Limit: 32/40). The calls left are the limit less the used. For a service that sends no remaining and limit headers."
+              },
+              "reset": {
+                "type": "string",
+                "description": "Response header with when the window resets: seconds, a duration (6m0s, 120ms), an HTTP date or an ISO 8601 time."
+              },
+              "reset_epoch": {
+                "type": "string",
+                "description": "Response header with the reset time as a Unix epoch."
+              }
+            }
+          }
+        },
+        "scope": {
+          "enum": [
+            "connection",
+            "integration"
+          ],
+          "description": "Whether the limit applies per connection or per integration."
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "path"
+      ],
+      "description": "One cheap request that proves the connection or key works.",
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "description": "HTTP method of the verify request."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Path of the verify request, relative to the API base URL."
+        },
+        "body": {
+          "type": "object",
+          "description": "A JSON body sent with POST, such as a GraphQL query. Fixed text: no placeholders are filled in it."
+        }
+      },
+      "dependencies": {
+        "body": {
+          "properties": {
+            "method": {
+              "const": "POST",
+              "description": "A body is sent with POST only."
+            }
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Caps the service sets on an app.",
+      "properties": {
+        "max_connections": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Connections the app may hold for this service, across all users."
+        }
+      }
+    },
+    "webhooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signature"
+      ],
+      "description": "How the service signs and labels its webhooks: the signature scheme, the event name, the delivery id, the handshake, and where the account id is in the payload.",
+      "properties": {
+        "secret": {
+          "enum": [
+            "webhook_secret",
+            "client_secret"
+          ],
+          "description": "Which secret checks the signature: the instance's webhook_secret, or its client_secret."
+        },
+        "signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "header"
+          ],
+          "description": "The signature: a header, HMAC-SHA256 of a signed string, hex or base64, with an optional prefix. Or, with kind token, a header that carries the shared secret itself.",
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "token"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "parts"
+                  ]
+                },
+                {
+                  "required": [
+                    "timestamp"
+                  ]
+                },
+                {
+                  "required": [
+                    "signed"
+                  ]
+                },
+                {
+                  "required": [
+                    "encoding"
+                  ]
+                },
+                {
+                  "required": [
+                    "algorithm"
+                  ]
+                },
+                {
+                  "required": [
+                    "secret_encoding"
+                  ]
+                },
+                {
+                  "required": [
+                    "secret_prefix"
+                  ]
+                }
+              ]
+            }
+          },
+          "properties": {
+            "kind": {
+              "enum": [
+                "hmac",
+                "token"
+              ],
+              "description": "hmac (default): an HMAC of the signed string. token: the header holds the shared secret itself (GitLab's X-Gitlab-Token), compared in constant time; weaker, since the value does not depend on the body, so kirak validate warns. A token scheme takes only header and prefix."
+            },
+            "header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The header that carries the signature."
+            },
+            "algorithm": {
+              "enum": [
+                "hmac-sha256",
+                "hmac-sha1",
+                "hmac-sha512"
+              ],
+              "description": "The HMAC's hash. Default hmac-sha256."
+            },
+            "secret_encoding": {
+              "enum": [
+                "text",
+                "base64"
+              ],
+              "description": "text (default): the secret's text is the HMAC key. base64: the secret encodes the key (Standard Webhooks, used by Svix)."
+            },
+            "secret_prefix": {
+              "type": "string",
+              "minLength": 1,
+              "description": "With a base64 secret: text before the base64 that is not part of the key, such as whsec_. Removed when present."
+            },
+            "encoding": {
+              "enum": [
+                "hex",
+                "base64"
+              ],
+              "description": "How the digest is written. Default hex."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "Text before the digest in the header, such as sha256=."
+            },
+            "signed": {
+              "type": "string",
+              "description": "The string that is signed: {body}, {timestamp}, {method}, {url} and {header.<name>} (a request header, such as Standard Webhooks' {header.webhook-id}). Default {body}."
+            },
+            "parts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "signature"
+              ],
+              "description": "For a signature header made of comma-separated key=value parts (Stripe and Calendly: t=1700000000,v1=<hex>): the key of the digest, and of the timestamp when the header carries it. Every part with the signature key is tried, so a header listing two (a secret being rotated) passes when either matches.",
+              "properties": {
+                "signature": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The key of the digest part, such as v1."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The key of the timestamp part, such as t. Then timestamp needs no header."
+                },
+                "separator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1,
+                  "description": "What separates the parts. Default a comma; Standard Webhooks uses a space (v1,<sig> v1,<sig>)."
+                },
+                "delimiter": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1,
+                  "description": "What separates a part's key from its value. Default =; Standard Webhooks uses a comma."
+                }
+              }
+            },
+            "timestamp": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tolerance"
+              ],
+              "description": "The timestamp, with the window (in seconds) a delivery may be out by: in its own header, or in the signature header (parts.timestamp).",
+              "properties": {
+                "header": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The header that carries the timestamp. Needed unless parts.timestamp names it."
+                },
+                "tolerance": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3600,
+                  "description": "The allowed difference, in seconds."
+                },
+                "unit": {
+                  "enum": [
+                    "s",
+                    "ms"
+                  ],
+                  "description": "Seconds or milliseconds. Default s."
+                }
+              }
+            }
+          }
+        },
+        "handshake": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "description": "A request the service makes to check the URL. Kinds query and body are answered before the signature is checked; kind hmac only after it.",
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "query"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "param"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "body"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "match",
+                  "answer"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "hmac"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "match",
+                  "value",
+                  "echo",
+                  "hmac"
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "query",
+                "body",
+                "hmac"
+              ],
+              "description": "query: a query parameter is echoed back as text. body: a JSON body field is echoed back as JSON (Slack's challenge). hmac: a signed delivery that matches gets back a body value and its HMAC with the webhook secret (Zoom's endpoint.url_validation)."
+            },
+            "param": {
+              "type": "string",
+              "minLength": 1,
+              "description": "For kind query: the query parameter."
+            },
+            "match": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "For kinds body and hmac: body fields and the values that mark a handshake, such as {\"type\": \"url_verification\"}. For hmac the keys may be dotted."
+            },
+            "answer": {
+              "type": "string",
+              "minLength": 1,
+              "description": "For kind body: the field to echo back."
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$",
+              "description": "For kind hmac: dotted path to the value to sign, such as payload.plainToken."
+            },
+            "echo": {
+              "type": "string",
+              "minLength": 1,
+              "description": "For kind hmac: the answer field that holds the value, such as plainToken."
+            },
+            "hmac": {
+              "type": "string",
+              "minLength": 1,
+              "description": "For kind hmac: the answer field that holds the value's HMAC, such as encryptedToken."
+            },
+            "algorithm": {
+              "enum": [
+                "hmac-sha256",
+                "hmac-sha1",
+                "hmac-sha512"
+              ],
+              "description": "For kind hmac: the HMAC's hash. Default hmac-sha256."
+            },
+            "encoding": {
+              "enum": [
+                "hex",
+                "base64"
+              ],
+              "description": "For kind hmac: how the HMAC is written. Default hex."
+            }
+          }
+        },
+        "event": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "header"
+              ]
+            },
+            {
+              "required": [
+                "path"
+              ]
+            }
+          ],
+          "description": "The event's name: a header, or a field of the body (Zoom's event, Stripe's type), and optionally a field of the body for the action (issues.opened). Exactly one of header and path.",
+          "properties": {
+            "header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The header that names the event."
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+              "description": "Dotted path in the body to the event's name, for a service that sends no event header."
+            },
+            "action_path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+              "description": "Dotted path in the body to the action, appended to the event name."
+            }
+          }
+        },
+        "delivery_id": {
+          "type": "object",
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "header"
+              ]
+            },
+            {
+              "required": [
+                "path"
+              ]
+            }
+          ],
+          "description": "Where the delivery's id is, used to drop duplicates: a header, or a field of the body. Exactly one of the two. Without it, the body's hash is the id.",
+          "properties": {
+            "header": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The header with the delivery id."
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+              "description": "Dotted path in the body to the delivery id (Typeform's event_id)."
+            }
+          }
+        },
+        "account_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?(\\.[A-Za-z0-9_]+(\\[[A-Za-z0-9_]+=[^\\].{}\\[]+\\])?)*$",
+          "description": "Dotted path in the body to the account id the event belongs to."
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Plain-language quirks, for people and agents."
+    },
+    "examples": {
+      "type": "array",
+      "description": "Example calls for people and agents, shown by the catalog.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "method",
+          "path"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A short name for the example."
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "HTTP method."
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/",
+            "description": "Path relative to the API base URL."
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "endpoint": {
+      "type": "string",
+      "pattern": "^(https://|\\{(settings|connect|connection)\\.)[^\\s]+$",
+      "description": "An https URL, or one that starts with a {settings.x}, {connect.x} or {connection.x} placeholder whose pattern holds the value to https. A placeholder may appear anywhere in it."
+    }
+  },
+  "x-kirak-version": "0.1.2"
+}

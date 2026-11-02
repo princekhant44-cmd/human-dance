@@ -1,0 +1,100 @@
+{
+  "$schema": "../.kirak/model.schema.json",
+  "table": "posts",
+  "soft_delete": true,
+  "indexes": [
+    {
+      "columns": [
+        "user_id"
+      ]
+    }
+  ],
+  "schema": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "content": {
+      "type": "text"
+    },
+    "user_id": {
+      "type": "integer",
+      "required": true
+    }
+  },
+  "access": {
+    "fetch": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "search": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "count": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "exists": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "create": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "update": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "delete": [
+      {
+        "role": "user",
+        "condition": "user_id = {user_id}"
+      },
+      {
+        "role": "admin"
+      }
+    ],
+    "destroy": [
+      {
+        "role": "admin"
+      }
+    ],
+    "restore": [
+      {
+        "role": "admin"
+      }
+    ]
+  }
+}
